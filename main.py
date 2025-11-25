@@ -1,6 +1,5 @@
-def main():
-    print("Hello from chatbot-rag!")
+from passlib.context import CryptContext
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-if __name__ == "__main__":
-    main()
+print(pwd_context.hash("admin123"))

@@ -81,4 +81,4 @@ vectorstore = Chroma.from_documents(
     persist_directory=persist_directory
 )
 
-print("🎉 Hoàn thành Bước 3! Đã nhúng tất cả dữ liệu và lưu vào Chroma DB.")
+print("Hoàn thành Bước 3! Đã nhúng tất cả dữ liệu và lưu vào Chroma DB.")
