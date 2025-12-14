@@ -21,6 +21,9 @@ def create_access_token(data: dict, expires_delta=None):
 def verify_password(plain: str, hashed: str):
     return pwd_context.verify(plain, hashed)
 
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
 def decode_admin_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

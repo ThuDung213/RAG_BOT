@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "bcrypt>=4.0.1",
+    "cloudinary>=1.44.0",
     "email-validator>=2.3.0",
     "fastapi>=0.120.2",
     "langchain>=1.0.2",
@@ -17,6 +18,7 @@ dependencies = [
     "langchain-text-splitters>=1.0.0",
     "passlib[bcrypt]>=1.7.4",
     "pymongo>=4.15.4",
+    "python-multipart>=0.0.20",
     "python-dotenv>=1.2.1",
     "requests>=2.32.5",
     "sentence-transformers>=5.1.2",

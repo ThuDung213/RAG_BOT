@@ -278,6 +278,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "bcrypt" },
+    { name = "cloudinary" },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "langchain" },
@@ -290,6 +291,7 @@ dependencies = [
     { name = "passlib", extra = ["bcrypt"] },
     { name = "pymongo" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "requests" },
     { name = "sentence-transformers" },
     { name = "uvicorn" },
@@ -298,6 +300,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "bcrypt", specifier = ">=4.0.1" },
+    { name = "cloudinary", specifier = ">=1.44.0" },
     { name = "email-validator", specifier = ">=2.3.0" },
     { name = "fastapi", specifier = ">=0.120.2" },
     { name = "langchain", specifier = ">=1.0.2" },
@@ -310,6 +313,7 @@ requires-dist = [
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "pymongo", specifier = ">=4.15.4" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "sentence-transformers", specifier = ">=5.1.2" },
     { name = "uvicorn", specifier = ">=0.38.0" },
@@ -367,6 +371,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/46/61/de6cd827efad202d7057d93e0fed9294b96952e188f7384832791c7b2254/click-8.3.0.tar.gz", hash = "sha256:e7b8232224eba16f4ebe410c25ced9f7875cb5f3263ffc93cc3e8da705e229c4", size = 276943, upload-time = "2025-09-18T17:32:23.696Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/db/d3/9dcc0f5797f070ec8edf30fbadfb200e71d9db6b84d211e3b2085a7589a0/click-8.3.0-py3-none-any.whl", hash = "sha256:9b9f285302c6e3064f4330c05f05b81945b2a39544279343e6e7c5f27a9baddc", size = 107295, upload-time = "2025-09-18T17:32:22.42Z" },
+]
+
+[[package]]
+name = "cloudinary"
+version = "1.44.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "six" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/35/938a4cc3b5ac386184a8ea50e357cdbb4239c2744fc8c652c461674447e6/cloudinary-1.44.1.tar.gz", hash = "sha256:62d4374b79d5476de2a86cb6a1da709a5429e02aef474bfc5d99f3e38a1a62ff", size = 188225, upload-time = "2025-06-17T16:31:33.279Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/f0/518d151d3dfc009940947fe9b26cdf9f6e2fb9e4a29c12fe5b5ebe8aad65/cloudinary-1.44.1-py3-none-any.whl", hash = "sha256:b4785031179a5ec7010f46665e5c8fad2cae022c18405546f01d257e02f78b1c", size = 147808, upload-time = "2025-06-17T16:31:32.188Z" },
 ]
 
 [[package]]
@@ -2465,6 +2483,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f0/26/19cadc79a718c5edbec86fd4919a6b6d3f681039a2f6d66d14be94e75fb9/python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6", size = 44221, upload-time = "2025-10-26T15:12:10.434Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/1b/a298b06749107c305e1fe0f814c6c74aea7b2f1e10989cb30f544a1b3253/python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61", size = 21230, upload-time = "2025-10-26T15:12:09.109Z" },
+]
+
+[[package]]
+name = "python-multipart"
+version = "0.0.20"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/87/f44d7c9f274c7ee665a29b885ec97089ec5dc034c7f3fafa03da9e39a09e/python_multipart-0.0.20.tar.gz", hash = "sha256:8dd0cab45b8e23064ae09147625994d090fa46f5b0d1e13af944c331a7fa9d13", size = 37158, upload-time = "2024-12-16T19:45:46.972Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/58/38b5afbc1a800eeea951b9285d3912613f2603bdf897a4ab0f4bd7f405fc/python_multipart-0.0.20-py3-none-any.whl", hash = "sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104", size = 24546, upload-time = "2024-12-16T19:45:44.423Z" },
 ]
 
 [[package]]
