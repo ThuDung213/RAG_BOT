@@ -2,7 +2,8 @@ from langchain_community.document_loaders import JSONLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from core.data_utils import load_and_clean_json
+from core.agent.data_utils import load_and_clean_json
+# from core.data_utils import load_and_clean_json
 
 from dotenv import load_dotenv
 import json
@@ -81,4 +82,4 @@ vectorstore = Chroma.from_documents(
     persist_directory=persist_directory
 )
 
-print("🎉 Hoàn thành Bước 3! Đã nhúng tất cả dữ liệu và lưu vào Chroma DB.")
+print("Hoàn thành Bước 3! Đã nhúng tất cả dữ liệu và lưu vào Chroma DB.")

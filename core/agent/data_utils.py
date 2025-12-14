@@ -1,6 +1,7 @@
 from langchain_core.documents import Document
 import json
 import os
+import re
 
 def load_and_clean_json(file_path):
     """
@@ -40,3 +41,34 @@ def load_and_clean_json(file_path):
             )
             documents.append(doc)
     return documents
+
+def parse_agent_response(response_text: str) -> dict:
+    """
+    Parse response text from agent to extract JSON if present.
+    Returns a dictionary with keys "answer" and "sources".
+    """
+    # Nếu response_text là một chuỗi JSON hợp lệ, thì parse trực tiếp
+    try:
+        data = json.loads(response_text)
+        if isinstance(data, dict) and "answer" in data and "sources" in data:
+            return data
+    except json.JSONDecodeError:
+        pass
+
+    # Nếu không, tìm kiếm pattern code block chứa JSON
+    pattern = r'```json\s*(.*?)\s*```'
+    matches = re.findall(pattern, response_text, re.DOTALL)
+    if matches:
+        json_str = matches[0]
+        try:
+            data = json.loads(json_str)
+            if isinstance(data, dict) and "answer" in data and "sources" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+    # Nếu không tìm thấy JSON, trả về toàn bộ response_text làm answer và sources rỗng
+    return {
+        "answer": response_text,
+        "sources": []
+    }

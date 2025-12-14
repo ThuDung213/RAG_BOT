@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from core.rag_agent import get_agent_response
+from api.routes.ask import router as ask_router
+from api.routes.auth.admin_auth import router as admin_auth_router
+from api.routes.auth.user_auth import router as user_auth_router
+from api.routes.community import router as community_router
+import uvicorn
 
 app = FastAPI(title="Danang History Agent API")
 
@@ -17,13 +21,19 @@ app.add_middleware(
     allow_methods=["*"],              # RẤT QUAN TRỌNG: Cho phép tất cả phương thức, bao gồm OPTIONS
     allow_headers=["*"],              # Cho phép tất cả các Header (bao gồm Content-Type)
 )
-class Question(BaseModel):
-    question: str
-    
-@app.post("/ask")
-async def ask_question(payload: Question):
-    try:
-        answer = get_agent_response(payload.question)
-        return {"answer": answer}
-    except Exception as e:
-        return {"error": str(e)}
+
+app.include_router(ask_router)
+app.include_router(admin_auth_router)
+app.include_router(user_auth_router)
+app.include_router(community_router)
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "api.main:app",
+        host="0.0.0.0",   
+        port=8000,         
+        workers=4,           # 4 processes
+        loop="asyncio",      # Event loop
+        access_log=False,    # Tắt log để tăng tốc
+        timeout_keep_alive=5 # Giảm timeout
+    )
