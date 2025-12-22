@@ -5,6 +5,7 @@ from api.routes.ask import router as ask_router
 from api.routes.auth.admin_auth import router as admin_auth_router
 from api.routes.auth.user_auth import router as user_auth_router
 from api.routes.community import router as community_router
+from api.routes.admin.locations import router as create_location
 import uvicorn
 
 app = FastAPI(title="Danang History Agent API")
@@ -22,6 +23,7 @@ app.add_middleware(
     allow_headers=["*"],              # Cho phép tất cả các Header (bao gồm Content-Type)
 )
 
+app.include_router(create_location)
 app.include_router(ask_router)
 app.include_router(admin_auth_router)
 app.include_router(user_auth_router)
@@ -29,7 +31,7 @@ app.include_router(community_router)
 
 if __name__ == "__main__":
     uvicorn.run(
-        "api.main:app",
+        "main:app",
         host="0.0.0.0",   
         port=8000,         
         workers=4,           # 4 processes

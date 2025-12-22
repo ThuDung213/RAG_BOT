@@ -10,12 +10,12 @@ if not MONGO_URI:
 
 client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 db = client["mydb"]
-
 admins = db["admins"]
 users = db["users"]
 posts = db["posts"]
 comments = db["comments"]
 post_likes = db["post_likes"]
+locations = db["locations"]
 
 def init_indexes() -> None:
     # Fail fast if cannot connect

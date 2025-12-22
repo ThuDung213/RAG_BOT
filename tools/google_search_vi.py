@@ -13,6 +13,7 @@ def google_search_vi(query: str) -> str:
     url = (
         f"https://www.googleapis.com/customsearch/v1"
         f"?q={query}&cx={CX}&key={API_KEY}&lr=lang_vi&safe=active"
+        f"&fields=items(title,link,snippet)"
     )
 
     try:
