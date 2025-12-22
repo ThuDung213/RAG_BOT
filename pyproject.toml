@@ -1,0 +1,25 @@
+[project]
+name = "chatbot-rag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bcrypt>=4.0.1",
+    "email-validator>=2.3.0",
+    "fastapi>=0.120.2",
+    "langchain>=1.0.2",
+    "langchain-chroma>=1.0.0",
+    "langchain-community>=0.4.1",
+    "langchain-core>=1.0.1",
+    "langchain-google-genai>=3.0.0",
+    "langchain-huggingface>=1.0.0",
+    "langchain-text-splitters>=1.0.0",
+    "passlib[bcrypt]>=1.7.4",
+    "pymongo>=4.15.4",
+    "python-dotenv>=1.2.1",
+    "python-jose>=3.5.0",
+    "requests>=2.32.5",
+    "sentence-transformers>=5.1.2",
+    "uvicorn>=0.38.0",
+]
