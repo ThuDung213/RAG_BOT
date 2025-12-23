@@ -16,6 +16,7 @@ posts = db["posts"]
 comments = db["comments"]
 post_likes = db["post_likes"]
 locations = db["locations"]
+gallery_collection = db["gallery"]
 
 def init_indexes() -> None:
     # Fail fast if cannot connect
