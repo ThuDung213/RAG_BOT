@@ -4,7 +4,9 @@ from pydantic import BaseModel
 from api.routes.ask import router as ask_router
 from api.routes.auth.admin_auth import router as admin_auth_router
 from api.routes.auth.user_auth import router as user_auth_router
+from api.routes.admin.community import router as admin_community_router
 from api.routes.community import router as community_router
+from database.mongo import init_indexes
 from api.routes.gallery import router as gallery_router
 from api.routes.admin.locations import router as create_location
 import uvicorn
@@ -29,7 +31,14 @@ app.include_router(gallery_router)
 app.include_router(ask_router)
 app.include_router(admin_auth_router)
 app.include_router(user_auth_router)
+app.include_router(admin_community_router)
 app.include_router(community_router)
+
+
+@app.on_event("startup")
+def _startup_init_indexes() -> None:
+    # Create required MongoDB indexes (idempotent) and fail fast if DB is unreachable.
+    init_indexes()
 
 if __name__ == "__main__":
     uvicorn.run(

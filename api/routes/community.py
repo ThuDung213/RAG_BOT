@@ -8,7 +8,9 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field, model_validator
 
-from database.mongo import users, posts, comments, post_likes
+from pymongo.errors import DuplicateKeyError
+
+from database.mongo import users, posts, comments, post_likes, post_reports
 from api.routes.auth.user_auth import get_current_user  # trả về email từ JWT
 
 router = APIRouter(prefix="/community", tags=["Community"])
@@ -26,6 +28,14 @@ def oid(s: str) -> ObjectId:
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def start_of_utc_day(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def to_utc_iso(dt: Any) -> Optional[str]:
@@ -56,18 +66,29 @@ def user_by_email(email: str) -> dict:
 def to_post_ui(post: dict, author: dict, is_liked: bool) -> dict:
     link = post.get("link") or None
     author_id = post.get("authorId")
+    status_val = post.get("status") or "approved"
+    flags = post.get("flags") or []
+    approved_dt = post.get("approved_at") or post.get("published_at")
+    # Backward-compatible: old approved posts (no status) won't have approved_at.
+    if approved_dt is None and post.get("status") is None:
+        approved_dt = post.get("createdAt")
     return {
         "id": str(post["_id"]),
         "authorId": str(author_id) if author_id else None,
         "author": author.get("full_name") or author.get("email"),
         "avatar": author.get("avatarUrl"),  # FE có thể tự fallback avatar nếu null
         "createdAt": to_utc_iso(post.get("createdAt")),
+        "approvedAt": to_utc_iso(approved_dt),
         "content": post.get("content", ""),
         "link": link,  # {title, source, img} | None
         "images": post.get("images") or [],
         "likes": int(post.get("likeCount", 0)),
         "commentCount": int(post.get("commentCount", 0)),
         "isLiked": bool(is_liked),
+        "status": status_val,
+        "flags": flags,
+        "moderation_feedback": post.get("moderation_feedback") if status_val == "need_edit" else None,
+        "rejected_reason": post.get("rejected_reason") if status_val == "rejected" else None,
     }
 
 
@@ -164,6 +185,21 @@ class UpdatePostPayload(BaseModel):
         return self
 
 
+class ReportPostPayload(BaseModel):
+    reason: str
+    note: Optional[str] = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_reason_and_note(self) -> "ReportPostPayload":
+        allowed = {"spam", "misinfo", "harassment", "adult", "copyright", "other"}
+        if self.reason not in allowed:
+            raise ValueError("Invalid reason")
+        if self.reason == "other":
+            if not (self.note or "").strip():
+                raise ValueError("note is required when reason=other")
+        return self
+
+
 # ----------------------------
 # Endpoints
 # ----------------------------
@@ -239,9 +275,17 @@ def list_posts(
     """
     current_user = user_by_email(current_email)
 
-    q: dict[str, Any] = {}
+    # Normal users should only see approved posts.
+    # Backward-compatible: old documents without `status` are treated as approved.
+    # Also exclude soft-deleted posts.
+    q: dict[str, Any] = {
+        "$and": [
+            {"$or": [{"status": "approved"}, {"status": {"$exists": False}}]},
+            {"deletedAt": {"$exists": False}},
+        ]
+    }
     if cursor:
-        q["_id"] = {"$lt": oid(cursor)}
+        q["$and"].append({"_id": {"$lt": oid(cursor)}})
 
     post_list = list(posts.find(q).sort([("_id", -1)]).limit(limit))
 
@@ -265,6 +309,39 @@ def list_posts(
     return {"items": items, "nextCursor": next_cursor}
 
 
+@router.get("/posts/mine")
+def list_my_posts(
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    cursor: Optional[str] = None,
+    current_email: str = Depends(get_current_user),
+):
+    """Return current user's posts across all statuses."""
+    current_user = user_by_email(current_email)
+
+    q: dict[str, Any] = {"authorId": current_user["_id"]}
+    cur = posts.find(q).sort([("_id", -1)])
+    if cursor:
+        # cursor-based pagination (backward compatible)
+        q["_id"] = {"$lt": oid(cursor)}
+        cur = posts.find(q).sort([("_id", -1)])
+    else:
+        # offset-based pagination (required by FE)
+        cur = cur.skip(offset)
+
+    post_list = list(cur.limit(limit))
+    post_ids = [p["_id"] for p in post_list]
+
+    liked = set()
+    if post_ids:
+        for lk in post_likes.find({"userId": current_user["_id"], "postId": {"$in": post_ids}}):
+            liked.add(lk["postId"])
+
+    items = [to_post_ui(p, current_user, p["_id"] in liked) for p in post_list]
+    next_cursor = str(post_list[-1]["_id"]) if post_list else None
+    return {"items": items, "nextCursor": next_cursor}
+
+
 @router.post("/posts", status_code=status.HTTP_201_CREATED)
 def create_post(payload: CreatePostPayload, current_email: str = Depends(get_current_user)):
     u = user_by_email(current_email)
@@ -276,11 +353,87 @@ def create_post(payload: CreatePostPayload, current_email: str = Depends(get_cur
         "images": [img.model_dump() for img in payload.images] if payload.images else [],
         "likeCount": 0,
         "commentCount": 0,
+        "status": "pending",
+        "flags": [],
+        "reportCount": 0,
+        "reportReasons": {},
+        "moderation_feedback": None,
+        "rejected_reason": None,
+        "moderated_by": None,
+        "moderated_at": None,
+        "approved_at": None,
         "createdAt": now_utc(),
         "updatedAt": now_utc(),
     }
     res = posts.insert_one(doc)
     return {"id": str(res.inserted_id)}
+
+
+@router.post("/posts/{post_id}/report")
+def report_post(
+    post_id: str,
+    payload: ReportPostPayload,
+    current_email: str = Depends(get_current_user),
+):
+    """Report a community post (requires user login).
+
+    Minimal logic:
+    - Validate reason; if reason=other then note is required.
+    - Prevent duplicates via unique (postId, reporterId).
+    - Persist to post_reports.
+    """
+    reporter = user_by_email(current_email)
+    pid = oid(post_id)
+
+    if not posts.find_one({"_id": pid}):
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # Basic rate limit: reports per user per UTC day.
+    # Keep it conservative; can be tuned via env.
+    limit_per_day = int(os.getenv("REPORTS_PER_DAY_LIMIT", "10"))
+    today = start_of_utc_day(now_utc())
+    used_today = post_reports.count_documents({"reporterId": reporter["_id"], "createdAt": {"$gte": today}})
+    if used_today >= limit_per_day:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    report_doc = {
+        "postId": pid,
+        "reporterId": reporter["_id"],
+        "reason": payload.reason,
+        "note": (payload.note or "").strip() or None,
+        "status": "open",
+        "resolvedAt": None,
+        "resolvedBy": None,
+        "resolution": None,
+        "createdAt": now_utc(),
+    }
+
+    try:
+        res = post_reports.insert_one(report_doc)
+        # Recommended: "queue" to admin by marking the post as reported + keeping counters.
+        posts.update_one(
+            {"_id": pid},
+            {
+                "$addToSet": {"flags": "reported"},
+                "$inc": {"reportCount": 1, f"reportReasons.{payload.reason}": 1},
+                "$set": {"updatedAt": now_utc()},
+            },
+        )
+        return {
+            "id": str(res.inserted_id),
+            "created": True,
+            "status": "reported",
+            "message": "Report created",
+        }
+    except DuplicateKeyError:
+        # Idempotent: already reported by this user.
+        existing = post_reports.find_one({"postId": pid, "reporterId": reporter["_id"]})
+        return {
+            "id": str(existing["_id"]) if existing else None,
+            "created": False,
+            "status": "already_reported",
+            "message": "You already reported this post",
+        }
 
 
 @router.patch("/posts/{post_id}", status_code=status.HTTP_200_OK)
@@ -306,6 +459,16 @@ def edit_post(post_id: str, payload: UpdatePostPayload, current_email: str = Dep
     # UpdatePostPayload already validates at least one field, but keep safe.
     if len(update) == 1:
         raise HTTPException(status_code=400, detail="No fields to update")
+
+    # If post was requested to edit by moderation, treat this edit as a resubmission.
+    if (p.get("status") or "approved") == "need_edit":
+        update["status"] = "pending"
+        # Keep the history in moderation_logs; clear current fields.
+        update["moderation_feedback"] = None
+        update["rejected_reason"] = None
+        update["moderated_by"] = None
+        update["moderated_at"] = None
+        update["approved_at"] = None
 
     posts.update_one({"_id": pid}, {"$set": update})
     p2 = posts.find_one({"_id": pid})
