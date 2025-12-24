@@ -66,11 +66,20 @@ CÁCH TRẢ LỜI:
 OUTPUT:
 Khi trả lời, bạn PHẢI trả về cấu trúc:
   "answer": "Câu trả lời tự nhiên bằng tiếng Việt",
-  "sources": ["link1", "link2", "link3"]
+  "sources": [
+        {
+            "url": "link_nguon_1",
+            "title": "tieu_de_bai_viet_1"
+        },
+        {
+            "url": "link_nguon_2",
+            "title": "tieu_de_bai_viet_2"
+        }
+    ]
 
 Trong đó:
 - "answer" chỉ chứa nội dung trả lời, KHÔNG chứa mục **Nguồn:**.
-- "sources" phải là mảng các link hoặc tên nguồn.
+- "sources" phải là **mảng các đối tượng JSON**, mỗi đối tượng chứa **"url"** và **"title"** của nguồn.
 - Nếu không có nguồn, trả về mảng rỗng.
 - KHÔNG được trả về bất kỳ định dạng nào khác ngoài JSON thuần.
 

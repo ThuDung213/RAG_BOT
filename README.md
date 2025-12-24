@@ -13,7 +13,7 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 cd chatbot_rag
 uv venv
-uv add fastapi uvicorn langchain langchain-core langchain-community langchain-huggingface langchain-chroma langchain-text-splitters python-dotenv langchain-google-genai sentence_transformers
+uv add fastapi uvicorn langchain langchain-core langchain-community langchain-huggingface langchain-chroma langchain-text-splitters python-dotenv langchain-google-genai sentence_transformers python-jose
 ```
 
 ### 3. Tạo file .env
