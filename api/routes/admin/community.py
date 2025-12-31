@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Optional, cast
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 
 from api.routes.auth.admin_auth import get_current_admin
 from database.mongo import moderation_logs, posts, users, post_reports
+
+from api.utils.community import now_utc, oid, to_utc_iso
+from database.schemas.admin_community import DeletePostPayload, NeedEditPayload, RejectPayload
 
 router = APIRouter(prefix="/admin/community", tags=["Admin Community"])
 
@@ -17,31 +18,7 @@ router = APIRouter(prefix="/admin/community", tags=["Admin Community"])
 # Helpers
 # ----------------------------
 ALLOWED_STATUSES = {"pending", "approved", "need_edit", "rejected"}
-ALLOWED_ACTIONS = {"approved", "need_edit", "rejected"}
 ALLOWED_REPORT_STATUSES = {"open", "resolved"}
-
-
-def oid(s: str) -> ObjectId:
-    try:
-        return ObjectId(s)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid id")
-
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def to_utc_iso(dt: Any) -> Optional[str]:
-    if dt is None:
-        return None
-    if not isinstance(dt, datetime):
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        dt = dt.astimezone(timezone.utc)
-    return dt.isoformat().replace("+00:00", "Z")
 
 
 def _post_to_admin_ui(post: dict, author: dict) -> dict:
@@ -225,21 +202,6 @@ def _insert_moderation_log(
             "createdAt": now_utc(),
         }
     )
-
-
-# ----------------------------
-# Schemas
-# ----------------------------
-class NeedEditPayload(BaseModel):
-    feedback: str = Field(min_length=1, max_length=2000)
-
-
-class RejectPayload(BaseModel):
-    reason: Optional[str] = Field(default=None, max_length=2000)
-
-
-class DeletePostPayload(BaseModel):
-    reason: Optional[str] = Field(default=None, max_length=2000)
 
 
 # ----------------------------
