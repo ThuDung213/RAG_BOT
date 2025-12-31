@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 
 from api.routes.auth.admin_auth import get_current_admin
 from database.mongo import moderation_logs, posts, users, post_reports
+
+from api.utils.community import now_utc, oid, to_utc_iso
+from database.schemas.admin_community import DeletePostPayload, NeedEditPayload, RejectPayload
 
 router = APIRouter(prefix="/admin/community", tags=["Admin Community"])
 
@@ -17,31 +18,7 @@ router = APIRouter(prefix="/admin/community", tags=["Admin Community"])
 # Helpers
 # ----------------------------
 ALLOWED_STATUSES = {"pending", "approved", "need_edit", "rejected"}
-ALLOWED_ACTIONS = {"approved", "need_edit", "rejected"}
 ALLOWED_REPORT_STATUSES = {"open", "resolved"}
-
-
-def oid(s: str) -> ObjectId:
-    try:
-        return ObjectId(s)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid id")
-
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def to_utc_iso(dt: Any) -> Optional[str]:
-    if dt is None:
-        return None
-    if not isinstance(dt, datetime):
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        dt = dt.astimezone(timezone.utc)
-    return dt.isoformat().replace("+00:00", "Z")
 
 
 def _post_to_admin_ui(post: dict, author: dict) -> dict:
@@ -228,21 +205,6 @@ def _insert_moderation_log(
 
 
 # ----------------------------
-# Schemas
-# ----------------------------
-class NeedEditPayload(BaseModel):
-    feedback: str = Field(min_length=1, max_length=2000)
-
-
-class RejectPayload(BaseModel):
-    reason: Optional[str] = Field(default=None, max_length=2000)
-
-
-class DeletePostPayload(BaseModel):
-    reason: Optional[str] = Field(default=None, max_length=2000)
-
-
-# ----------------------------
 # Endpoints
 # ----------------------------
 @router.get("/posts")
@@ -279,6 +241,8 @@ def admin_approve_post(post_id: str, admin: dict = Depends(get_current_admin)):
 
     flags_snapshot = p.get("flags") or []
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
@@ -287,7 +251,7 @@ def admin_approve_post(post_id: str, admin: dict = Depends(get_current_admin)):
                 "approved_at": now_utc(),
                 "moderation_feedback": None,
                 "rejected_reason": None,
-                "moderated_by": admin.get("_id"),
+                "moderated_by": admin_id,
                 "moderated_at": now_utc(),
                 "updatedAt": now_utc(),
             }
@@ -299,7 +263,7 @@ def admin_approve_post(post_id: str, admin: dict = Depends(get_current_admin)):
         action="approved",
         note="",
         flags_snapshot=list(flags_snapshot),
-        admin_id=admin.get("_id"),
+        admin_id=admin_id,
     )
 
     return {"ok": True}
@@ -320,6 +284,8 @@ def admin_need_edit_post(
 
     feedback = payload.feedback.strip()
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
@@ -328,7 +294,7 @@ def admin_need_edit_post(
                 "approved_at": None,
                 "moderation_feedback": feedback,
                 "rejected_reason": None,
-                "moderated_by": admin.get("_id"),
+                "moderated_by": admin_id,
                 "moderated_at": now_utc(),
                 "updatedAt": now_utc(),
             }
@@ -340,7 +306,7 @@ def admin_need_edit_post(
         action="need_edit",
         note=feedback,
         flags_snapshot=list(flags_snapshot),
-        admin_id=admin.get("_id"),
+        admin_id=admin_id,
     )
 
     return {"ok": True}
@@ -361,6 +327,8 @@ def admin_reject_post(
 
     reason = (payload.reason or "").strip()
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
@@ -369,7 +337,7 @@ def admin_reject_post(
                 "approved_at": None,
                 "rejected_reason": reason or None,
                 "moderation_feedback": None,
-                "moderated_by": admin.get("_id"),
+                "moderated_by": admin_id,
                 "moderated_at": now_utc(),
                 "updatedAt": now_utc(),
             }
@@ -381,7 +349,7 @@ def admin_reject_post(
         action="rejected",
         note=reason,
         flags_snapshot=list(flags_snapshot),
-        admin_id=admin.get("_id"),
+        admin_id=admin_id,
     )
 
     return {"ok": True}
@@ -399,13 +367,15 @@ def admin_dismiss_reports_for_post(post_id: str, admin: dict = Depends(get_curre
     if not posts.find_one({"_id": pid}):
         raise HTTPException(status_code=404, detail="Post not found")
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     res = post_reports.update_many(
         {"postId": pid, "status": "open"},
         {
             "$set": {
                 "status": "resolved",
                 "resolvedAt": now_utc(),
-                "resolvedBy": admin.get("_id"),
+                "resolvedBy": admin_id,
                 "resolution": "dismissed",
             }
         },
@@ -439,12 +409,14 @@ def admin_soft_delete_post(
 
     reason = ((payload.reason if payload else None) or "").strip() or None
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
             "$set": {
                 "deletedAt": now_utc(),
-                "deletedBy": admin.get("_id"),
+                "deletedBy": admin_id,
                 "deletedReason": reason,
                 # backward-compatible
                 "deleteReason": reason,
@@ -460,7 +432,7 @@ def admin_soft_delete_post(
             "$set": {
                 "status": "resolved",
                 "resolvedAt": now_utc(),
-                "resolvedBy": admin.get("_id"),
+                "resolvedBy": admin_id,
                 "resolution": "deleted",
             }
         },
