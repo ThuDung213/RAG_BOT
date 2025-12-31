@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -118,7 +118,7 @@ def admin_approve_post(post_id: str, current_admin: dict = Depends(get_current_a
     if not p:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    admin_id = current_admin.get("_id")
+    admin_id = cast(ObjectId, current_admin.get("_id"))
     flags_snapshot = list(p.get("flags") or [])
 
     posts.update_one(
@@ -151,7 +151,7 @@ def admin_need_edit_post(post_id: str, body: NeedEditBody, current_admin: dict =
     if not p:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    admin_id = current_admin.get("_id")
+    admin_id = cast(ObjectId, current_admin.get("_id"))
     flags_snapshot = list(p.get("flags") or [])
 
     posts.update_one(
@@ -185,7 +185,7 @@ def admin_reject_post(post_id: str, body: RejectBody, current_admin: dict = Depe
     if not p:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    admin_id = current_admin.get("_id")
+    admin_id = cast(ObjectId, current_admin.get("_id"))
     flags_snapshot = list(p.get("flags") or [])
 
     reason = (body.reason or "").strip()

@@ -1,5 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 
 class Image(BaseModel):
@@ -9,6 +10,19 @@ class Image(BaseModel):
     verified: Optional[bool] = False
 
 
-class Gallery(BaseModel):
-    year: int = Field(..., example=1970)
+class GalleryBase(BaseModel):
+    year: int = Field(gt=2000, lt=2100)
     images: List[Image]
+
+
+class GalleryCreate(GalleryBase):
+    """Schema khi tạo gallery"""
+    modifiedBy: Optional[str] = None
+
+
+class GalleryResponse(GalleryBase):
+    """Schema trả về cho gallery"""
+    id: str
+    modifiedBy: Optional[str] = None
+    createdAt: datetime
+    updatedAt: datetime

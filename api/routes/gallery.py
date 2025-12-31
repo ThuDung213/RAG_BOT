@@ -1,24 +1,39 @@
 from fastapi import APIRouter, HTTPException
-from database.mongo import gallery_collection
-from database.schemas.gallery import Gallery
+from database.mongo import gallery
+from database.schemas.gallery import GalleryResponse
+from typing import List
 
 router = APIRouter(prefix="/gallery", tags=["Gallery"])
 
 
-@router.get("", response_model=list[Gallery])
+@router.get("", response_model=List[GalleryResponse])
 def get_all_galleries(limit: int = 50):
-    data = list(gallery_collection.find({}, {"_id": 0}).sort("year", 1).limit(limit))
-    return data
+    docs = list(gallery.find({}).sort("year", 1).limit(limit))
+    items = []
+    for d in docs:
+        items.append(
+            {
+                "id": str(d.get("_id")),
+                "year": d.get("year"),
+                "images": d.get("images") or [],
+                "modifiedBy": d.get("modifiedBy"),
+                "createdAt": d.get("createdAt"),
+                "updatedAt": d.get("updatedAt"),
+            }
+        )
+    return items
 
 
-@router.get("/{year}", response_model=Gallery)
+@router.get("/{year}", response_model=GalleryResponse)
 def get_gallery_by_year(year: int):
-    data = gallery_collection.find_one(
-        {"year": year},
-        {"_id": 0}
-    )
-
-    if not data:
+    d = gallery.find_one({"year": year})
+    if not d:
         raise HTTPException(status_code=404, detail="Year not found")
-
-    return data
+    return {
+        "id": str(d.get("_id")),
+        "year": d.get("year"),
+        "images": d.get("images") or [],
+        "modifiedBy": d.get("modifiedBy"),
+        "createdAt": d.get("createdAt"),
+        "updatedAt": d.get("updatedAt"),
+    }

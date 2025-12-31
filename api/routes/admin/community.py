@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -279,6 +279,8 @@ def admin_approve_post(post_id: str, admin: dict = Depends(get_current_admin)):
 
     flags_snapshot = p.get("flags") or []
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
@@ -287,7 +289,7 @@ def admin_approve_post(post_id: str, admin: dict = Depends(get_current_admin)):
                 "approved_at": now_utc(),
                 "moderation_feedback": None,
                 "rejected_reason": None,
-                "moderated_by": admin.get("_id"),
+                "moderated_by": admin_id,
                 "moderated_at": now_utc(),
                 "updatedAt": now_utc(),
             }
@@ -299,7 +301,7 @@ def admin_approve_post(post_id: str, admin: dict = Depends(get_current_admin)):
         action="approved",
         note="",
         flags_snapshot=list(flags_snapshot),
-        admin_id=admin.get("_id"),
+        admin_id=admin_id,
     )
 
     return {"ok": True}
@@ -320,6 +322,8 @@ def admin_need_edit_post(
 
     feedback = payload.feedback.strip()
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
@@ -328,7 +332,7 @@ def admin_need_edit_post(
                 "approved_at": None,
                 "moderation_feedback": feedback,
                 "rejected_reason": None,
-                "moderated_by": admin.get("_id"),
+                "moderated_by": admin_id,
                 "moderated_at": now_utc(),
                 "updatedAt": now_utc(),
             }
@@ -340,7 +344,7 @@ def admin_need_edit_post(
         action="need_edit",
         note=feedback,
         flags_snapshot=list(flags_snapshot),
-        admin_id=admin.get("_id"),
+        admin_id=admin_id,
     )
 
     return {"ok": True}
@@ -361,6 +365,8 @@ def admin_reject_post(
 
     reason = (payload.reason or "").strip()
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
@@ -369,7 +375,7 @@ def admin_reject_post(
                 "approved_at": None,
                 "rejected_reason": reason or None,
                 "moderation_feedback": None,
-                "moderated_by": admin.get("_id"),
+                "moderated_by": admin_id,
                 "moderated_at": now_utc(),
                 "updatedAt": now_utc(),
             }
@@ -381,7 +387,7 @@ def admin_reject_post(
         action="rejected",
         note=reason,
         flags_snapshot=list(flags_snapshot),
-        admin_id=admin.get("_id"),
+        admin_id=admin_id,
     )
 
     return {"ok": True}
@@ -399,13 +405,15 @@ def admin_dismiss_reports_for_post(post_id: str, admin: dict = Depends(get_curre
     if not posts.find_one({"_id": pid}):
         raise HTTPException(status_code=404, detail="Post not found")
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     res = post_reports.update_many(
         {"postId": pid, "status": "open"},
         {
             "$set": {
                 "status": "resolved",
                 "resolvedAt": now_utc(),
-                "resolvedBy": admin.get("_id"),
+                "resolvedBy": admin_id,
                 "resolution": "dismissed",
             }
         },
@@ -439,12 +447,14 @@ def admin_soft_delete_post(
 
     reason = ((payload.reason if payload else None) or "").strip() or None
 
+    admin_id = cast(ObjectId, admin.get("_id"))
+
     posts.update_one(
         {"_id": pid},
         {
             "$set": {
                 "deletedAt": now_utc(),
-                "deletedBy": admin.get("_id"),
+                "deletedBy": admin_id,
                 "deletedReason": reason,
                 # backward-compatible
                 "deleteReason": reason,
@@ -460,7 +470,7 @@ def admin_soft_delete_post(
             "$set": {
                 "status": "resolved",
                 "resolvedAt": now_utc(),
-                "resolvedBy": admin.get("_id"),
+                "resolvedBy": admin_id,
                 "resolution": "deleted",
             }
         },

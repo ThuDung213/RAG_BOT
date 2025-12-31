@@ -18,7 +18,7 @@ post_likes = db["post_likes"]
 moderation_logs = db["moderation_logs"]
 post_reports = db["post_reports"]
 locations = db["locations"]
-gallery_collection = db["gallery"]
+gallery = db["gallery"]
 
 def init_indexes() -> None:
     # Fail fast if cannot connect
@@ -27,7 +27,13 @@ def init_indexes() -> None:
     users.create_index([("email", 1)], unique=True)
     posts.create_index([("createdAt", -1)])
     posts.create_index([("status", 1), ("createdAt", -1)])
-    posts.create_index([("authorId", 1), ("createdAt", -1)])
+    # index theo tác giả (schemas sử dụng `userId`)
+    posts.create_index([("userId", 1), ("createdAt", -1)])
+    # tìm nhanh theo số báo cáo / cờ
+    posts.create_index([("reportCount", -1)])
+    posts.create_index([("flags", 1)])
+    # index cho trường moderated_by để tra cứu lịch sử kiểm duyệt
+    posts.create_index([("moderated_by", 1), ("moderated_at", -1)])
     post_likes.create_index([("postId", 1), ("userId", 1)], unique=True)
     post_likes.create_index([("postId", 1), ("createdAt", -1)])
     comments.create_index([("postId", 1), ("createdAt", -1)])
@@ -41,3 +47,9 @@ def init_indexes() -> None:
     post_reports.create_index([("reporterId", 1), ("createdAt", -1)])
     post_reports.create_index([("status", 1), ("createdAt", -1)])
     post_reports.create_index([("postId", 1), ("status", 1), ("createdAt", -1)])
+    # gallery: index by year (unique per year)
+    try:
+        gallery.create_index([("year", 1)], unique=True)
+    except Exception:
+        # ignore if index exists or cannot be created during some test envs
+        pass
