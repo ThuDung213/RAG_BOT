@@ -1,9 +1,34 @@
+from __future__ import annotations
+
+from typing import Any, List
+
 from fastapi import APIRouter, HTTPException
 from database.mongo import gallery
 from database.schemas.gallery import GalleryResponse
-from typing import List
 
 router = APIRouter(prefix="/gallery", tags=["Gallery"])
+
+
+def _normalize_images(raw: Any) -> list[dict]:
+    if not raw:
+        return []
+    items: list[dict] = []
+    for img in raw:
+        if isinstance(img, str):
+            items.append({"url": img, "caption": "", "location": "", "verified": False})
+            continue
+        if isinstance(img, dict):
+            url = img.get("url") or img.get("secure_url") or img.get("src")
+            if isinstance(url, str) and url:
+                items.append(
+                    {
+                        "url": url,
+                        "caption": img.get("caption") or "",
+                        "location": img.get("location") or "",
+                        "verified": bool(img.get("verified")) if "verified" in img else False,
+                    }
+                )
+    return items
 
 
 @router.get("", response_model=List[GalleryResponse])
@@ -15,7 +40,7 @@ def get_all_galleries(limit: int = 50):
             {
                 "id": str(d.get("_id")),
                 "year": d.get("year"),
-                "images": d.get("images") or [],
+                "images": _normalize_images(d.get("images")),
                 "modifiedBy": d.get("modifiedBy"),
                 "createdAt": d.get("createdAt"),
                 "updatedAt": d.get("updatedAt"),
@@ -32,7 +57,7 @@ def get_gallery_by_year(year: int):
     return {
         "id": str(d.get("_id")),
         "year": d.get("year"),
-        "images": d.get("images") or [],
+        "images": _normalize_images(d.get("images")),
         "modifiedBy": d.get("modifiedBy"),
         "createdAt": d.get("createdAt"),
         "updatedAt": d.get("updatedAt"),

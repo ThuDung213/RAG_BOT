@@ -11,12 +11,13 @@ class Image(BaseModel):
 
 
 class GalleryBase(BaseModel):
-    year: int = Field(gt=2000, lt=2100)
+    year: int
     images: List[Image]
 
 
 class GalleryCreate(GalleryBase):
     """Schema khi tạo gallery"""
+    year: int = Field(gt=2000, lt=2100)
     modifiedBy: Optional[str] = None
 
 
@@ -24,5 +25,5 @@ class GalleryResponse(GalleryBase):
     """Schema trả về cho gallery"""
     id: str
     modifiedBy: Optional[str] = None
-    createdAt: datetime
-    updatedAt: datetime
+    createdAt: Optional[datetime] = None
+    updatedAt: Optional[datetime] = None
