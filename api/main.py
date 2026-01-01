@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from api.routes.ask import router as ask_router
 from api.routes.auth.admin_auth import router as admin_auth_router
@@ -9,9 +12,15 @@ from api.routes.community import router as community_router
 from database.mongo import init_indexes
 from api.routes.gallery import router as gallery_router
 from api.routes.admin.locations import router as create_location
+from api.routes.locations import router as locations_router
 import uvicorn
 
 app = FastAPI(title="Danang History Agent API")
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+UPLOADS_DIR = ROOT_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 origins = [
     "http://localhost:5173", 
@@ -27,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(create_location)
+app.include_router(locations_router)
 app.include_router(gallery_router)
 app.include_router(ask_router)
 app.include_router(admin_auth_router)
