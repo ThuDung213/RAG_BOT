@@ -53,7 +53,7 @@ def _post_to_admin_ui(post: dict, author: dict) -> dict:
 
 @router.get("/reports")
 def admin_list_reports(
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
     status_filter: str = Query("open", alias="status"),
     _admin: dict = Depends(get_current_admin),
@@ -89,7 +89,7 @@ def admin_list_reports(
                 "reasons": {"$push": "$reason"},
             }
         },
-        {"$sort": {"lastReportedAt": -1}},
+        {"$sort": {"lastReportedAt": -1, "_id": -1}},
         {"$skip": offset},
         {"$limit": limit},
     ]
@@ -210,16 +210,21 @@ def _insert_moderation_log(
 @router.get("/posts")
 def admin_list_posts(
     status_filter: str = Query("pending", alias="status"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     _admin: dict = Depends(get_current_admin),
 ):
     if status_filter not in ALLOWED_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid status")
 
-    q: dict[str, Any] = {"status": status_filter}
+    # Legacy: approved posts may have missing status.
+    if status_filter == "approved":
+        q: dict[str, Any] = {"$or": [{"status": "approved"}, {"status": {"$exists": False}}, {"status": None}]}
+    else:
+        q = {"status": status_filter}
 
-    post_list = list(posts.find(q).sort([("_id", -1)]).skip(offset).limit(limit))
+    total = int(posts.count_documents(q))
+    post_list = list(posts.find(q).sort([("createdAt", -1), ("_id", -1)]).skip(offset).limit(limit))
 
     author_ids = list({p.get("authorId") for p in post_list if p.get("authorId")})
     author_map = {u["_id"]: u for u in users.find({"_id": {"$in": author_ids}})}
@@ -229,7 +234,7 @@ def admin_list_posts(
         a = author_map.get(p.get("authorId"), {})
         items.append(_post_to_admin_ui(p, a))
 
-    return {"items": items}
+    return {"items": items, "total": total}
 
 
 @router.post("/posts/{post_id}/approve", status_code=status.HTTP_200_OK)
@@ -243,17 +248,23 @@ def admin_approve_post(post_id: str, admin: dict = Depends(get_current_admin)):
 
     admin_id = cast(ObjectId, admin.get("_id"))
 
+    approved_now = now_utc()
+    published_at = p.get("published_at") or p.get("publishedAt") or approved_now
+
     posts.update_one(
         {"_id": pid},
         {
             "$set": {
                 "status": "approved",
-                "approved_at": now_utc(),
+                # Latest approval timestamp (may change on re-approvals)
+                "approved_at": approved_now,
+                # First time the post became public (stable across re-approvals)
+                "published_at": published_at,
                 "moderation_feedback": None,
                 "rejected_reason": None,
                 "moderated_by": admin_id,
-                "moderated_at": now_utc(),
-                "updatedAt": now_utc(),
+                "moderated_at": approved_now,
+                "updatedAt": approved_now,
             }
         },
     )

@@ -280,26 +280,42 @@ def edit_post(post_id: str, payload: UpdatePostPayload, current_email: str = Dep
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
     update: dict[str, Any] = {"updatedAt": now_utc()}
+    has_moderated_change = False
+
     if payload.content is not None:
-        update["content"] = payload.content.strip()
+        new_content = payload.content.strip()
+        update["content"] = new_content
+        old_content = (p.get("content") or "").strip()
+        has_moderated_change = has_moderated_change or (new_content != old_content)
+
     if payload.link is not None:
-        update["link"] = payload.link.model_dump()
+        new_link = payload.link.model_dump()
+        update["link"] = new_link
+        old_link = p.get("link") or None
+        has_moderated_change = has_moderated_change or (new_link != old_link)
+
     if payload.images is not None:
-        update["images"] = [img.model_dump() for img in payload.images]
+        new_images = [img.model_dump() for img in payload.images]
+        update["images"] = new_images
+        old_images = p.get("images") or []
+        has_moderated_change = has_moderated_change or (new_images != old_images)
 
     # UpdatePostPayload already validates at least one field, but keep safe.
     if len(update) == 1:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    # If post was requested to edit by moderation, treat this edit as a resubmission.
-    if (p.get("status") or "approved") == "need_edit":
+    # If a moderated post (approved / need_edit / legacy-approved) is edited, treat as resubmission.
+    status_val = p.get("status")
+    is_legacy_approved = (status_val is None)
+    is_approved_or_need_edit = (status_val in {"approved", "need_edit"}) or is_legacy_approved
+    if has_moderated_change and is_approved_or_need_edit:
         update["status"] = "pending"
-        # Keep the history in moderation_logs; clear current fields.
+        # Clear current moderation/approval fields so it disappears from approved feed.
+        update["approved_at"] = None
+        update["moderated_at"] = None
+        update["moderated_by"] = None
         update["moderation_feedback"] = None
         update["rejected_reason"] = None
-        update["moderated_by"] = None
-        update["moderated_at"] = None
-        update["approved_at"] = None
 
     posts.update_one({"_id": pid}, {"$set": update})
     p2 = posts.find_one({"_id": pid})
@@ -309,7 +325,7 @@ def edit_post(post_id: str, payload: UpdatePostPayload, current_email: str = Dep
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_200_OK)
 def delete_post(post_id: str, current_email: str = Depends(get_current_user)):
-    """Chỉ tác giả mới được xoá bài viết. Khi xoá sẽ dọn comments/likes liên quan."""
+    """Chỉ tác giả mới được xoá bài viết. Khi xoá sẽ dọn comments/likes/reports liên quan."""
     u = user_by_email(current_email)
     pid = oid(post_id)
 
@@ -340,11 +356,13 @@ def delete_post(post_id: str, current_email: str = Depends(get_current_user)):
     deleted_post = posts.delete_one({"_id": pid}).deleted_count
     deleted_comments = comments.delete_many({"postId": pid}).deleted_count
     deleted_likes = post_likes.delete_many({"postId": pid}).deleted_count
+    deleted_reports = post_reports.delete_many({"postId": pid}).deleted_count
 
     return {
         "deleted": bool(deleted_post),
         "deletedComments": int(deleted_comments),
         "deletedLikes": int(deleted_likes),
+        "deletedReports": int(deleted_reports),
         "deletedCloudinaryImages": int(deleted_cloudinary),
     }
 

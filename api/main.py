@@ -8,6 +8,7 @@ from api.routes.ask import router as ask_router
 from api.routes.auth.admin_auth import router as admin_auth_router
 from api.routes.auth.user_auth import router as user_auth_router
 from api.routes.admin.community import router as admin_community_router
+from api.routes.admin.users import router as admin_users_router
 from api.routes.community import router as community_router
 from database.mongo import init_indexes
 from api.routes.gallery import router as gallery_router
@@ -25,6 +26,8 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 origins = [
     "http://localhost:5173", 
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
 ]
 
 app.add_middleware(
@@ -42,6 +45,7 @@ app.include_router(ask_router)
 app.include_router(admin_auth_router)
 app.include_router(user_auth_router)
 app.include_router(admin_community_router)
+app.include_router(admin_users_router)
 app.include_router(community_router)
 
 
@@ -52,7 +56,7 @@ def _startup_init_indexes() -> None:
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        "api.main:app",
         host="0.0.0.0",   
         port=8000,         
         workers=4,           # 4 processes

@@ -12,6 +12,7 @@ client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 db = client["mydb"]
 admins = db["admins"]
 users = db["users"]
+audit_logs = db["audit_logs"]
 posts = db["posts"]
 comments = db["comments"]
 post_likes = db["post_likes"]
@@ -25,6 +26,12 @@ def init_indexes() -> None:
     client.admin.command("ping")
 
     users.create_index([("email", 1)], unique=True)
+    users.create_index([("createdAt", -1)])
+    users.create_index([("status", 1), ("createdAt", -1)])
+
+    # Admin audit logs
+    audit_logs.create_index([("targetUserId", 1), ("createdAt", -1)])
+    audit_logs.create_index([("actorId", 1), ("createdAt", -1)])
     posts.create_index([("createdAt", -1)])
     posts.create_index([("status", 1), ("createdAt", -1)])
     # index theo tác giả (schemas sử dụng `userId`)
