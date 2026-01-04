@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 from typing import Optional
@@ -9,6 +10,8 @@ from fastapi import APIRouter, HTTPException, status, Depends, File, UploadFile,
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from database.mongo import users
+from api.utils.community import now_utc
+from models.user import user_document
 from core.security.security import (
     create_access_token,
     verify_password,
@@ -117,12 +120,16 @@ async def register_user(user_data: UserRegister):
     hashed_password = get_password_hash(user_data.password)
 
     # 3. Lưu vào MongoDB
-    new_user = {
-        "email": user_data.email,
-        "password": hashed_password, # Lưu mật khẩu đã mã hóa
-        "full_name": user_data.full_name,
-        "role": "user"
-    }
+    new_user = user_document(
+        {
+            "email": user_data.email,
+            "password": hashed_password,  # Lưu mật khẩu đã mã hóa
+            "full_name": user_data.full_name,
+            "role": "user",
+            "status": "active",
+            "block": {"isBlocked": False},
+        }
+    )
     users.insert_one(new_user)
 
     return {"message": "Đăng ký thành công"}
@@ -139,6 +146,32 @@ async def login_user(login_data: UserLogin):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email hoặc mật khẩu không đúng",
         )
+
+    # Enforce blocked users
+    status_val = user.get("status") or "active"
+    block = user.get("block") or {}
+    is_blocked = bool(block.get("isBlocked")) or (status_val == "blocked")
+
+    blocked_until = block.get("blockedUntil")
+    if is_blocked and isinstance(blocked_until, datetime):
+        now = now_utc()
+        if blocked_until.tzinfo is None:
+            blocked_until = blocked_until.replace(tzinfo=timezone.utc)
+        if blocked_until <= now:
+            users.update_one(
+                {"_id": user.get("_id")},
+                {"$set": {"status": "active", "block": {"isBlocked": False}, "updatedAt": now}},
+            )
+            is_blocked = False
+
+    if is_blocked:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is blocked")
+
+    # Update last login
+    users.update_one(
+        {"_id": user.get("_id")},
+        {"$set": {"lastLoginAt": now_utc(), "updatedAt": now_utc()}},
+    )
 
     # 3. Tạo token (nhúng user_id để FE decode ra currentUser.id)
     access_token = create_access_token(data={"sub": user["email"], "user_id": str(user["_id"])})
@@ -170,7 +203,10 @@ def update_me(payload: UpdateMePayload, current_email: str = Depends(get_current
     if not full_name:
         raise HTTPException(status_code=400, detail="full_name is required")
 
-    res = users.update_one({"email": current_email}, {"$set": {"full_name": full_name}})
+    res = users.update_one(
+        {"email": current_email},
+        {"$set": {"full_name": full_name, "updatedAt": now_utc()}},
+    )
     if res.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
@@ -241,7 +277,10 @@ async def upload_avatar(
         base = _build_public_base_url(request)
         avatar_url = f"{base}/uploads/avatars/{filename}"
 
-    users.update_one({"email": current_email}, {"$set": {"avatarUrl": avatar_url}})
+    users.update_one(
+        {"email": current_email},
+        {"$set": {"avatarUrl": avatar_url, "updatedAt": now_utc()}},
+    )
     u2 = users.find_one({"email": current_email})
     return _user_to_me_response(u2)
 
@@ -257,5 +296,8 @@ def change_password(payload: ChangePasswordPayload, current_email: str = Depends
 
     _enforce_password_policy(payload.new_password)
     new_hash = get_password_hash(payload.new_password)
-    users.update_one({"email": current_email}, {"$set": {"password": new_hash}})
+    users.update_one(
+        {"email": current_email},
+        {"$set": {"password": new_hash, "updatedAt": now_utc()}},
+    )
     return {"ok": True}

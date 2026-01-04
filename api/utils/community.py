@@ -59,7 +59,10 @@ def to_post_ui(post: dict, author: dict, is_liked: bool) -> dict:
     author_id = post.get("authorId")
     status_val = post.get("status") or "approved"
     flags = post.get("flags") or []
-    approved_dt = post.get("approved_at") or post.get("published_at")
+    # For user-facing timestamps, prefer the original publish time if present.
+    # `published_at` is intended to be the first time the post became public.
+    # `approved_at` may change on re-approvals after edits.
+    approved_dt = post.get("published_at") or post.get("approved_at")
     # Backward-compatible: old approved posts (no status) won't have approved_at.
     if approved_dt is None and post.get("status") is None:
         approved_dt = post.get("createdAt")
