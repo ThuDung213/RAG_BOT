@@ -5,9 +5,14 @@ from datetime import datetime
 
 class Image(BaseModel):
     url: str
+    publicId: Optional[str] = None
     caption: Optional[str] = ""
     location: Optional[str] = ""
     verified: Optional[bool] = False
+    width: Optional[int] = None
+    height: Optional[int] = None
+    bytes: Optional[int] = None
+    format: Optional[str] = None
 
 
 class GalleryBase(BaseModel):

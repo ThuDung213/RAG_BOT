@@ -97,12 +97,24 @@ def cloudinary_is_configured() -> bool:
 
 
 def cloudinary_init() -> None:
+    # If env vars are not set, try loading a .env file (optional dependency)
+    if not cloudinary_is_configured():
+        try:
+            from dotenv import load_dotenv  # type: ignore
+        except Exception:
+            load_dotenv = None
+
+        if load_dotenv:
+            # attempt to load .env from repo root
+            load_dotenv()
+
     if not cloudinary_is_configured():
         raise HTTPException(
             status_code=500,
             detail=(
                 "Cloudinary is not configured. Set CLOUDINARY_URL or "
-                "CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET."
+                "CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET. "
+                "You can place these in a .env file at the project root and install python-dotenv."
             ),
         )
     try:
