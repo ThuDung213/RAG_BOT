@@ -6,6 +6,10 @@ from langchain.tools import tool
 from dotenv import load_dotenv
 import os
 import json
+import time
+import random
+import re
+import threading
 from tools.danang_history_knowledge_base import create_danang_history_tool
 from tools.google_search_vi import google_search_vi
 from core.agent.data_utils import parse_agent_response
@@ -95,6 +99,77 @@ model = init_chat_model(
     temperature=0,
 )
 
+
+class _RateLimiter:
+    def __init__(self, requests_per_minute: int) -> None:
+        self._rpm = max(int(requests_per_minute), 0)
+        self._min_interval = 0.0 if self._rpm <= 0 else 60.0 / float(self._rpm)
+        self._lock = threading.Lock()
+        self._next_allowed = 0.0
+
+    def wait(self) -> None:
+        if self._min_interval <= 0:
+            return
+        sleep_for = 0.0
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next_allowed:
+                sleep_for = self._next_allowed - now
+                self._next_allowed += self._min_interval
+            else:
+                self._next_allowed = now + self._min_interval
+        if sleep_for > 0:
+            time.sleep(sleep_for)
+
+
+_GEMINI_RPM = int(os.getenv("GEMINI_RATE_LIMIT_RPM", "15"))
+_GEMINI_MAX_RETRIES = int(os.getenv("GEMINI_MAX_RETRIES", "6"))
+_GEMINI_RETRY_BASE_SECONDS = float(os.getenv("GEMINI_RETRY_BASE_SECONDS", "2"))
+_GEMINI_RETRY_MAX_SECONDS = float(os.getenv("GEMINI_RETRY_MAX_SECONDS", "90"))
+
+_rate_limiter = _RateLimiter(_GEMINI_RPM)
+
+
+def _extract_retry_seconds(error_text: str) -> float | None:
+    # Gemini/Google responses can contain either:
+    # - "Please retry in 35.18s"
+    # - "retry_delay { seconds: 35 }"
+    match = re.search(r"Please retry in\s+([0-9]+(?:\.[0-9]+)?)s", error_text, re.IGNORECASE)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return None
+
+    match = re.search(r"retry_delay\s*\{[^}]*seconds:\s*([0-9]+)", error_text, re.IGNORECASE | re.DOTALL)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return None
+
+    return None
+
+
+def _is_quota_or_rate_limit_error(exc: Exception) -> bool:
+    name = type(exc).__name__
+    text = str(exc)
+    if name in {"ResourceExhausted", "TooManyRequests"}:
+        return True
+    if "429" in text:
+        return True
+    lowered = text.lower()
+    return any(
+        marker in lowered
+        for marker in [
+            "quota exceeded",
+            "rate limit",
+            "too many requests",
+            "resourceexhausted",
+            "exceeded your current quota",
+        ]
+    )
+
 # Create agent
 agent = create_agent(
     model=model,
@@ -105,32 +180,44 @@ agent = create_agent(
 # Get Agent Response
 def get_agent_response(question: str) -> str:
     """Hàm chạy Agent Executor với câu hỏi của người dùng."""
-    try:
-        response = agent.invoke({
-            "messages": [{"role": "user", "content": question}]
-        })
-        #  # In ra các message trong luồng phản hồi
-        # for msg in response["messages"]:
-        #     msg.pretty_print()
-            
-        final_msg = response["messages"][-1].content
-        
-        if isinstance(final_msg, list) and len(final_msg) > 0:
-            final_msg = final_msg[0].get("text", "") if isinstance(final_msg[0], dict) else final_msg[0]
-        if not isinstance(final_msg, str):
-            final_msg = str(final_msg)
-        
-        parse = parse_agent_response(str(final_msg))
-        return {
-            "answer": parse.get("answer", ""),
-            "sources": parse.get("sources", [])
-        }
-        
-    except Exception as e:
-        error_data = {
-            "answer": "Lỗi hệ thống khi thực thi Agent.",
-            "sources": [],
-            "error_details": str(e)
-        }
-        return json.dumps(error_data, ensure_ascii=False, indent=2)
+    last_error: Exception | None = None
+    for attempt in range(_GEMINI_MAX_RETRIES + 1):
+        try:
+            _rate_limiter.wait()
+            response = agent.invoke({
+                "messages": [{"role": "user", "content": question}]
+            })
+
+            final_msg = response["messages"][-1].content
+            if isinstance(final_msg, list) and len(final_msg) > 0:
+                final_msg = final_msg[0].get("text", "") if isinstance(final_msg[0], dict) else final_msg[0]
+            if not isinstance(final_msg, str):
+                final_msg = str(final_msg)
+
+            parse = parse_agent_response(str(final_msg))
+            return {
+                "answer": parse.get("answer", ""),
+                "sources": parse.get("sources", [])
+            }
+
+        except Exception as e:
+            last_error = e
+            if not _is_quota_or_rate_limit_error(e) or attempt >= _GEMINI_MAX_RETRIES:
+                break
+
+            error_text = str(e)
+            retry_seconds = _extract_retry_seconds(error_text)
+            if retry_seconds is None:
+                retry_seconds = min(_GEMINI_RETRY_BASE_SECONDS * (2 ** attempt), _GEMINI_RETRY_MAX_SECONDS)
+
+            # Add small jitter to avoid thundering herd.
+            retry_seconds = min(retry_seconds + random.uniform(0.0, 1.0), _GEMINI_RETRY_MAX_SECONDS)
+            time.sleep(max(0.0, retry_seconds))
+
+    error_data = {
+        "answer": "Hệ thống đang bị giới hạn quota/rate limit của Gemini. Vui lòng đợi và thử lại.",
+        "sources": [],
+        "error_details": str(last_error) if last_error else "Unknown error"
+    }
+    return json.dumps(error_data, ensure_ascii=False, indent=2)
     

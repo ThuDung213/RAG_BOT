@@ -17,8 +17,9 @@ async def upload_files_to_cloudinary(files: List[UploadFile], folder: str) -> Li
     except Exception:
         raise HTTPException(status_code=500, detail="Missing dependency: cloudinary")
 
-    # Read and validate all files first
+    # Read and validate all files first (preserve the original filenames)
     file_datas = []
+    original_filenames: List[str] = []
     for f in files:
         if not (f.content_type or "").startswith("image/"):
             raise HTTPException(status_code=400, detail=f"Invalid content_type: {f.content_type}")
@@ -27,6 +28,7 @@ async def upload_files_to_cloudinary(files: List[UploadFile], folder: str) -> Li
         if len(data) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large (max 10MB each)")
         file_datas.append(data)
+        original_filenames.append(f.filename)
 
     def _upload(data_bytes):
         return uploader.upload(
@@ -44,11 +46,15 @@ async def upload_files_to_cloudinary(files: List[UploadFile], folder: str) -> Li
         raise HTTPException(status_code=502, detail=f"Cloudinary upload failed: {e}")
 
     uploaded = []
-    for res in results:
+    for idx, res in enumerate(results):
+        original_filename = original_filenames[idx] if idx < len(original_filenames) else None
         uploaded.append(
             {
                 "url": res.get("secure_url") or res.get("url"),
                 "publicId": res.get("public_id"),
+                # Keep the exact client-uploaded filename for FE caption mapping.
+                "originalFilename": original_filename,
+                "filename": original_filename,
                 "width": res.get("width"),
                 "height": res.get("height"),
                 "bytes": res.get("bytes"),
