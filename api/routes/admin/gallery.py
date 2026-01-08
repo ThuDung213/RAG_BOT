@@ -82,6 +82,7 @@ async def admin_upload_gallery_images(
                 "url": u.get("url"),
                 "publicId": u.get("publicId"),
                 "originalFilename": original_filename,
+                "year": year,
                 "caption": caption,
                 "location": "",
                 "verified": False,
