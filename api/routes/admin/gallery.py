@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from datetime import datetime
 import time
 import os
+import json
 
 from database.mongo import gallery
 from database.schemas.gallery import GalleryCreate, GalleryResponse
@@ -43,6 +44,7 @@ def admin_get_all_galleries(limit: int = 100, admin_email: str = Depends(get_cur
 async def admin_upload_gallery_images(
     files: List[UploadFile] = File(...),
     year: Optional[int] = Form(None),
+    meta: Optional[str] = Form(None),
     admin_email: str = Depends(get_current_admin),
 ):
     if len(files) > 50:
@@ -54,15 +56,34 @@ async def admin_upload_gallery_images(
     upload_time = time.time() - start
     print(f"[admin_upload_gallery_images] uploaded {len(uploaded)} files in {upload_time:.2f}s to folder={folder}")
 
+    meta_map: dict = {}
+    if meta:
+        try:
+            parsed = json.loads(meta)
+            if isinstance(parsed, dict):
+                meta_map = parsed
+            else:
+                raise ValueError("meta must be a JSON object")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid meta JSON: {e}")
+
     # Normalize items to store in DB (include metadata + publicId)
     images_to_store = []
     now = datetime.utcnow()
     for u in uploaded:
+        original_filename = u.get("originalFilename") or u.get("filename")
+        caption = ""
+        if isinstance(original_filename, str) and original_filename and original_filename in meta_map:
+            meta_item = meta_map.get(original_filename)
+            if isinstance(meta_item, dict) and isinstance(meta_item.get("caption"), str):
+                caption = meta_item.get("caption")
         images_to_store.append(
             {
                 "url": u.get("url"),
                 "publicId": u.get("publicId"),
-                "caption": "",
+                "originalFilename": original_filename,
+                "year": year,
+                "caption": caption,
                 "location": "",
                 "verified": False,
                 "width": u.get("width"),
@@ -88,6 +109,41 @@ async def admin_upload_gallery_images(
         print(f"[admin_upload_gallery_images] DB upsert time: {db_time:.2f}s (year={year})")
 
     return {"images": uploaded}
+
+
+@router.patch("/gallery/images")
+def admin_batch_update_gallery_images(
+    payload: list[dict],
+    admin_email: str = Depends(get_current_admin),
+):
+    """Batch update image captions.
+
+    Payload example:
+    [{"publicId": "...", "caption": "..."}, ...]
+    """
+    if not isinstance(payload, list) or not payload:
+        raise HTTPException(status_code=400, detail="Payload must be a non-empty list")
+
+    now = datetime.utcnow()
+    total_matched = 0
+    total_modified = 0
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        public_id = item.get("publicId")
+        caption = item.get("caption")
+        if not isinstance(public_id, str) or not public_id:
+            continue
+        if not isinstance(caption, str):
+            continue
+        res = gallery.update_one(
+            {"images.publicId": public_id},
+            {"$set": {"images.$.caption": caption, "modifiedBy": admin_email, "updatedAt": now}},
+        )
+        total_matched += int(getattr(res, "matched_count", 0) or 0)
+        total_modified += int(getattr(res, "modified_count", 0) or 0)
+
+    return {"matchedCount": total_matched, "modifiedCount": total_modified}
 
 
 @router.delete("/gallery/{public_id:path}")
@@ -143,7 +199,12 @@ def admin_update_gallery_image(
     else:
         filter_q = {"images.url": url}
 
-    res = gallery.update_many(filter_q, {"$set": set_fields})
+    now = datetime.utcnow()
+    set_fields["modifiedBy"] = admin_email
+    set_fields["updatedAt"] = now
+
+    # Use update_one so we update a single gallery document and the matched array element
+    res = gallery.update_one(filter_q, {"$set": set_fields})
 
     return {"matchedCount": res.matched_count, "modifiedCount": res.modified_count}
 

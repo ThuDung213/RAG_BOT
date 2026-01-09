@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from core.agent.rag_agent import get_agent_response
 import asyncio
 import time
+import json
 router = APIRouter()
 class Question(BaseModel):
     question: str
@@ -31,8 +32,15 @@ async def ask_question(payload: Question):
             get_agent_response, 
             payload.question
         )
-        
-        response_data = {"answer": answer}
+
+        # get_agent_response returns dict on success, JSON string on error
+        if isinstance(answer, str):
+            try:
+                response_data = json.loads(answer)
+            except Exception:
+                response_data = {"answer": answer, "sources": []}
+        else:
+            response_data = answer
         
         # Lưu cache
         response_cache[cache_key] = {
