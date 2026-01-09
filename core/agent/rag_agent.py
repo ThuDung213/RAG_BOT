@@ -73,7 +73,6 @@ QUY TẮC SỬ DỤNG CÔNG CỤ (RẤT QUAN TRỌNG):
 
 6. QUY TẮC VỀ ĐƠN VỊ HÀNH CHÍNH ĐÀ NẴNG:
    - Từ ngày 1/1/2025, Đà Nẵng KHÔNG còn đơn vị hành chính gọi là "quận".
-   - Thành phố hiện có 8 đơn vị hành chính cấp huyện theo cơ cấu mới.
    - Ở cấp xã/phường: Đà Nẵng có 94 đơn vị hành chính cấp xã, gồm 23 phường, 70 xã, 01 đặc khu Hoàng Sa.
    - Diện tích: 11.859,59 km²; Dân số: khoảng 3.065.628 người (năm 2025). 
    - Nếu người dùng hỏi về "quận" (ví dụ: quận Hải Châu, quận Thanh Khê...), PHẢI trả lời rằng các đơn vị này đã được sáp nhập/đổi tên, và giải thích rõ tình trạng hiện tại.
