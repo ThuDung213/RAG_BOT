@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "question": "Chùa Linh Ứng ở Đà Nẵng có bao nhiêu ngôi chùa và nằm ở đâu?",
+    "category": "HISTORY",
+    "expected_topics": ["Sơn Trà", "Ngũ Hành Sơn", "Bà Nà", "3 ngôi chùa"]
+  },
+  {
+    "id": 2,
+    "question": "Tính đến năm 2025, Đà Nẵng có bao nhiêu đơn vị hành chính cấp xã?",
+    "category": "ADMIN",
+    "expected_topics": ["94 đơn vị", "2025", "Quảng Nam", "sáp nhập"]
+  },
+  {
+    "id": 3,
+    "question": "Cầu Nguyễn Văn Trỗi có lịch sử như thế nào?",
+    "category": "HISTORY",
+    "expected_topics": ["cầu lâu đời", "lịch sử"]
+  },
+  {
+    "id": 4,
+    "question": "Hoàng Sa hiện nay thuộc đơn vị hành chính nào của Đà Nẵng?",
+    "category": "ADMIN",
+    "expected_topics": ["đặc khu Hoàng Sa"]
+  },
+  {
+    "id": 5,
+    "question": "Dự báo thời tiết Đà Nẵng ngày mai như thế nào?",
+    "category": "NEWS",
+    "expected_topics": ["thời tiết", "google search"]
+  },
+  {
+    "id": 6,
+    "question": "Làm thế nào để học lập trình Python?",
+    "category": "IRRELEVANT",
+    "expected_topics": ["không liên quan", "du lịch và lịch sử Đà Nẵng"]
+  },
+  {
+    "id": 7,
+    "question": "Chào bạn, bạn có thể giúp tôi tìm hiểu về Đà Nẵng không?",
+    "category": "CHATTING",
+    "expected_topics": ["thân thiện", "sẵn sàng giúp đỡ"]
+  }
+]

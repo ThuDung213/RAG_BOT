@@ -8,6 +8,7 @@ load_dotenv()  # load từ file .env
 @tool("google_search_vi")
 def google_search_vi(query: str) -> str:
     """Tìm kiếm tiếng Việt bằng Google Custom Search API"""
+    print("---GOOGLE SEARCH VI---", query)
     API_KEY = os.getenv("CUSTOM_SEARCH_API")
     CX = os.getenv("SEARCH_ENGINE_ID")
     url = (

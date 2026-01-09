@@ -6,6 +6,7 @@ def create_danang_history_tool(retriever):
         """
         Công cụ truy xuất kiến thức nội bộ về Lịch sử / Văn hóa Đà Nẵng.
         """
+        print("---DANANG HISTORY KNOWLEDGE BASE---", query)
         docs = retriever.invoke(query)
         formatted = []
         for i, d in enumerate(docs, start=1):

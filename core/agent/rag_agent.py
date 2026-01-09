@@ -19,12 +19,12 @@ load_dotenv()
 # --- Cấu hình DB đã lưu ---
 persist_directory = 'chroma_db_for_agent_bge' 
 embedding_model_name = "BAAI/bge-small-en-v1.5"
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-2.5-flash-lite"
 
 # Reload Embedding model
 embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
 
-# Load Vector Store
+# Load Vector Store (ChromaDB)
 vectorstore = Chroma(
     persist_directory=persist_directory,
     embedding_function=embedding_model
@@ -63,8 +63,25 @@ QUY TẮC SỬ DỤNG CÔNG CỤ (RẤT QUAN TRỌNG):
 4. Nếu câu hỏi là chào hỏi, trò chuyện hoặc không yêu cầu dữ liệu thực tế →
    Trả lời trực tiếp, KHÔNG dùng tool.
 
+5.Nếu câu hỏi KHÔNG liên quan đến Đà Nẵng (ví dụ: sản phẩm công nghệ, chính trị, thể thao, giải trí, địa phương khác):
+   → KHÔNG được gọi bất kỳ tool nào.
+   → Trả lời duy nhất: 
+      {
+        "answer": "Xin lỗi, tôi chỉ chuyên hỗ trợ về lịch sử, văn hóa và địa danh Đà Nẵng.",
+        "sources": []
+      }
+
+6. QUY TẮC VỀ ĐƠN VỊ HÀNH CHÍNH ĐÀ NẴNG:
+   - Từ ngày 1/1/2025, Đà Nẵng KHÔNG còn đơn vị hành chính gọi là "quận".
+   - Thành phố hiện có 8 đơn vị hành chính cấp huyện theo cơ cấu mới.
+   - Ở cấp xã/phường: Đà Nẵng có 47 đơn vị hành chính, gồm 36 phường và 11 xã.
+   - Nếu người dùng hỏi về "quận" (ví dụ: quận Hải Châu, quận Thanh Khê...), PHẢI trả lời rằng các đơn vị này đã được sáp nhập/đổi tên, và giải thích rõ tình trạng hiện tại.
+   - KHÔNG được trả lời theo dữ liệu cũ (6 quận, 2 huyện).
+   - Nếu dữ liệu trong RAG chưa cập nhật, PHẢI gọi "google_search_vi" để lấy thông tin mới nhất.
+
+      
 CÁCH TRẢ LỜI:
-- Trả lời tự nhiên, mạch lạc bằng tiếng Việt.
+- Trả lời tự nhiên, mạch lạc, ngắn gọn bằng tiếng Việt.
 - Nếu trả lời dạng văn bản: có thể trích nguồn.
 
 OUTPUT:

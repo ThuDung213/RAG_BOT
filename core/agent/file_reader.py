@@ -60,11 +60,11 @@ text_splitter = RecursiveCharacterTextSplitter(
 
 chunks = text_splitter.split_documents(all_documents)
 
-print(f"Tổng số đoạn (chunks) đã tạo: {len(chunks)}")
+print(f"Tổng chunks đã tạo: {len(chunks)}")
 
 
 # --- B3: Embedding and Save
-model_kwargs = {'device': 'cpu'}  # 'cpu' là an toàn nhất. Dùng 'cuda' nếu bạn có GPU mạnh.
+model_kwargs = {'device': 'cpu'} 
 encode_kwargs = {'normalize_embeddings': True}
 
 embedding_model = HuggingFaceEmbeddings(
@@ -72,14 +72,14 @@ embedding_model = HuggingFaceEmbeddings(
     model_kwargs=model_kwargs,
     encode_kwargs=encode_kwargs
 )
-print("✅ Đã khởi tạo thành công Embedding Model.{model_name}")
-print(f"📁 Vector Database sẽ được lưu tại: {persist_directory}")
+print("Tạo thành công Embedding Model.{model_name}")
+print(f"Vector Database lưu tại: {persist_directory}")
 
-# Create vs Save vector store
+# Tạo vs Save vector store
 vectorstore = Chroma.from_documents(
     documents=chunks,
     embedding=embedding_model,
     persist_directory=persist_directory
 )
 
-print("Hoàn thành Bước 3! Đã nhúng tất cả dữ liệu và lưu vào Chroma DB.")
+print("Hoàn thành Bước 3. Đã nhúng tất cả dữ liệu và lưu vào Chroma DB.")
