@@ -6,6 +6,7 @@ from datetime import datetime
 class Image(BaseModel):
     url: str
     publicId: Optional[str] = None
+    year: Optional[int] = None
     caption: Optional[str] = ""
     location: Optional[str] = ""
     verified: Optional[bool] = False
