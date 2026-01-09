@@ -67,6 +67,19 @@ def parse_agent_response(response_text: str) -> dict:
         except json.JSONDecodeError:
             pass
 
+    # Nếu model trả về dạng: <text>\n\n{ "answer": ..., "sources": ... }
+    # thì cố gắng trích JSON object đầu tiên hợp lệ từ chuỗi.
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(response_text):
+        if ch != "{":
+            continue
+        try:
+            obj, _end = decoder.raw_decode(response_text[i:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and "answer" in obj and "sources" in obj:
+            return obj
+
     # Nếu không tìm thấy JSON, trả về toàn bộ response_text làm answer và sources rỗng
     return {
         "answer": response_text,
